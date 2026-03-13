@@ -1,85 +1,139 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const passport = require('passport');
-const authJwtController = require('./auth_jwt'); // You're not using authController, consider removing it
-const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const User = require('./Users');
-const Movie = require('./Movies'); // You're not using Movie, consider removing it
+const jwt = require('jsonwebtoken');
 
+const User = require('./Users');
+const Movie = require('./Movies');
+const authJwtController = require('./auth_jwt');
+
+const mongoose = require('mongoose');
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-
 app.use(passport.initialize());
 
+// Connect to MongoDB
+mongoose.connect(process.env.DB)
+  .then(() => console.log('server.js PHAM-HW3 Connected to MongoDB'))
+  .catch(err => {
+    console.error('server.js PHAM-HW3 MongoDB Connection Error:', err);
+    process.exit(1);
+  });
+
+// Home route
+app.get('/', (req, res) => {
+    res.send('PHAM_Assignment3_MoviesAPI is Live!');
+});
+
+// Routes
 const router = express.Router();
 
-// Removed getJSONObjectForMovieRequirement as it's not used
-
-router.post('/signup', async (req, res) => { // Use async/await
-  if (!req.body.username || !req.body.password) {
-    return res.status(400).json({ success: false, msg: 'Please include both username and password to signup.' }); // 400 Bad Request
-  }
+// Signup
+router.post('/signup', async (req, res) => {
+  if (!req.body.username || !req.body.password)
+    return res.status(400).json({ success: false, msg: 'Username and password required.' });
 
   try {
-    const user = new User({ // Create user directly with the data
+    const user = new User({
       name: req.body.name,
       username: req.body.username,
-      password: req.body.password,
+      password: req.body.password
     });
 
-    await user.save(); // Use await with user.save()
-
-    res.status(201).json({ success: true, msg: 'Successfully created new user.' }); // 201 Created
+    await user.save();
+    res.status(201).json({ success: true, msg: 'User created successfully.' });
   } catch (err) {
-    if (err.code === 11000) { // Strict equality check (===)
-      return res.status(409).json({ success: false, message: 'A user with that username already exists.' }); // 409 Conflict
-    } else {
-      console.error(err); // Log the error for debugging
-      return res.status(500).json({ success: false, message: 'Something went wrong. Please try again later.' }); // 500 Internal Server Error
-    }
+    if (err.code === 11000)
+      return res.status(409).json({ success: false, msg: 'Username already exists.' });
+    else
+      return res.status(500).json({ success: false, msg: err.message });
   }
 });
 
-
-router.post('/signin', async (req, res) => { // Use async/await
+// Signin
+router.post('/signin', async (req, res) => {
   try {
     const user = await User.findOne({ username: req.body.username }).select('name username password');
+    if (!user) return res.status(401).json({ success: false, msg: 'User not found.' });
 
-    if (!user) {
-      return res.status(401).json({ success: false, msg: 'Authentication failed. User not found.' }); // 401 Unauthorized
-    }
-
-    const isMatch = await user.comparePassword(req.body.password); // Use await
-
+    const isMatch = await user.comparePassword(req.body.password);
     if (isMatch) {
-      const userToken = { id: user._id, username: user.username }; // Use user._id (standard Mongoose)
-      const token = jwt.sign(userToken, process.env.SECRET_KEY, { expiresIn: '1h' }); // Add expiry to the token (e.g., 1 hour)
+      const token = jwt.sign({ id: user._id, username: user.username }, process.env.SECRET_KEY, { expiresIn: '1h' });
       res.json({ success: true, token: 'JWT ' + token });
     } else {
-      res.status(401).json({ success: false, msg: 'Authentication failed. Incorrect password.' }); // 401 Unauthorized
+      res.status(401).json({ success: false, msg: 'Incorrect password.' });
     }
   } catch (err) {
-    console.error(err); // Log the error
-    res.status(500).json({ success: false, message: 'Something went wrong. Please try again later.' }); // 500 Internal Server Error
+    res.status(500).json({ success: false, msg: err.message });
   }
 });
 
+// Movies CRUD
 router.route('/movies')
-    .get(authJwtController.isAuthenticated, async (req, res) => {
-        return res.status(500).json({ success: false, message: 'GET request not supported' });
-    })
-    .post(authJwtController.isAuthenticated, async (req, res) => {
-        return res.status(500).json({ success: false, message: 'POST request not supported' });
-    });
+  .post(authJwtController.isAuthenticated, async (req, res) => {
+    try {
+      const movie = new Movie(req.body);
+      const savedMovie = await movie.save();
+      res.status(201).json(savedMovie);
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  })
+  .get(authJwtController.isAuthenticated, async (req, res) => {
+    try {
+      const movies = await Movie.find();
+      res.status(200).json(movies);
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
+// Single movie operations
+// Single movie operations by title
+router.route('/movies/:title')
+  .get(authJwtController.isAuthenticated, async (req, res) => {
+    try {
+      const movie = await Movie.findOne({ title: req.params.title });
+      if (!movie) return res.status(404).json({ success: false, msg: 'Movie not found' });
+      res.status(200).json(movie);
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  })
+  .put(authJwtController.isAuthenticated, async (req, res) => {
+    try {
+      const updatedMovie = await Movie.findOneAndUpdate(
+        { title: req.params.title },
+        req.body,
+        { new: true, runValidators: true }
+      );
+      if (!updatedMovie) return res.status(404).json({ success: false, msg: 'Movie not found' });
+      res.status(200).json(updatedMovie);
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  })
+  .delete(authJwtController.isAuthenticated, async (req, res) => {
+    try {
+      const deletedMovie = await Movie.findOneAndDelete({ title: req.params.title });
+      if (!deletedMovie) return res.status(404).json({ success: false, msg: 'Movie not found' });
+      res.status(200).json({ success: true, msg: 'Movie deleted' });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+// Use router
 app.use('/', router);
 
-const PORT = process.env.PORT || 8080; // Define PORT before using it
+// Start server
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
-
-module.exports = app; // for testing only
