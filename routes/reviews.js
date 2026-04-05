@@ -1,12 +1,12 @@
 /*Step 2: Route for adding API Reviews.js*/
+/*routes/reviews.js*/
 
 var express = require('express');
 var router = express.Router();
 var passport = require('passport');
 
 // require the Review model
-var Review = require('../models/reviews');
-
+var Review = require('../Reviews');
 /**
  * GET all reviews (optionally by movieId)
  * Example: /api/reviews?movieId=123

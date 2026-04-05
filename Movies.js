@@ -1,17 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.DB);
-    console.log("Movies.js PHAM-HW4 Connected to MongoDB");
-  } catch (error) {
-    console.error("PHAM-HW4 MongoDB Connection Error:", error);
-    process.exit(1);
-  }
-};
-
-connectDB();
 
 // Movie schema
 // Must add FIVE movies

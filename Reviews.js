@@ -1,7 +1,6 @@
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 
-mongoose.connect(process.env.DB);
 
 // Review schema
 var ReviewSchema = new Schema({
