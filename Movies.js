@@ -4,9 +4,9 @@ const Schema = mongoose.Schema;
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.DB);
-    console.log("Movies.js PHAM-HW3 Connected to MongoDB");
+    console.log("Movies.js PHAM-HW4 Connected to MongoDB");
   } catch (error) {
-    console.error("PHAM-HW3 MongoDB Connection Error:", error);
+    console.error("PHAM-HW4 MongoDB Connection Error:", error);
     process.exit(1);
   }
 };

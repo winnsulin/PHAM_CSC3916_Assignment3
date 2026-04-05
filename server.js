@@ -20,15 +20,15 @@ app.use(passport.initialize());
 
 // Connect to MongoDB
 mongoose.connect(process.env.DB)
-  .then(() => console.log('server.js PHAM-HW3 Connected to MongoDB'))
+  .then(() => console.log('server.js PHAM-HW4 Connected to MongoDB'))
   .catch(err => {
-    console.error('server.js PHAM-HW3 MongoDB Connection Error:', err);
+    console.error('server.js PHAM-HW4 MongoDB Connection Error:', err);
     process.exit(1);
   });
 
 // Home route
 app.get('/', (req, res) => {
-    res.send('PHAM_Assignment3_MoviesAPI is Live!');
+    res.send('PHAM_Assignment4_MoviesAPI is Live!');
 });
 
 // Routes
