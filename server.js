@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const User = require('./Users');
 const Movie = require('./Movies');
 const authJwtController = require('./auth_jwt');
+const reviewsRouter = require('./routes/reviews');
 
 const mongoose = require('mongoose');
 const app = express();
@@ -45,7 +46,6 @@ router.post('/signup', async (req, res) => {
       username: req.body.username,
       password: req.body.password
     });
-
     await user.save();
     res.status(201).json({ success: true, msg: 'User created successfully.' });
   } catch (err) {
@@ -74,8 +74,33 @@ router.post('/signin', async (req, res) => {
   }
 });
 
-// Movies CRUD
+// Movies collection route
 router.route('/movies')
+  .get(authJwtController.isAuthenticated, async (req, res) => {
+    try {
+      if (req.query.reviews === 'true') {
+        // aggregate movies + reviews
+        const moviesWithReviews = await Movie.aggregate([
+          {
+            $lookup: {
+              from: 'reviews',         // must match your MongoDB collection name
+              localField: '_id',       // Movie._id
+              foreignField: 'movieId', // Review.movieId
+              as: 'reviews'
+            }
+          }
+        ]);
+        return res.json(moviesWithReviews);
+      }
+
+      // simple find
+      const movies = await Movie.find();
+      res.json(movies);
+
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  })
   .post(authJwtController.isAuthenticated, async (req, res) => {
     try {
       const movie = new Movie(req.body);
@@ -84,49 +109,19 @@ router.route('/movies')
     } catch (err) {
       res.status(400).json({ success: false, error: err.message });
     }
-  })
+  });
+
+// Single movie by title
+router.route('/movies/:title')
   .get(authJwtController.isAuthenticated, async (req, res) => {
     try {
-      const movies = await Movie.find();
-      res.status(200).json(movies);
+      const movie = await Movie.findOne({ title: req.params.title });
+      if (!movie) return res.status(404).json({ success: false, msg: 'Movie not found' });
+      res.status(200).json(movie);
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }
-  });
-
-// Single movie operations
-// Single movie operations by title
-router.route('/movies/:title')
-  router.route('/movies')
-  .get(authJwtController.isAuthenticated, async (req, res) => {
-    try {
-
-      // ✅ If reviews=true → aggregation
-      if (req.query.reviews === 'true') {
-
-        const moviesWithReviews = await Movie.aggregate([
-          {
-            $lookup: {
-              from: 'reviews',          // collection name in MongoDB (lowercase plural!)
-              localField: '_id',        // Movie._id
-              foreignField: 'movieId',  // Review.movieId
-              as: 'reviews'             // new field added
-            }
-          }
-        ]);
-
-        return res.json(moviesWithReviews);
-      }
-
-      // case no reviews yet
-      const movies = await Movie.find();
-      res.json(movies);
-
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
   })
-  
   .put(authJwtController.isAuthenticated, async (req, res) => {
     try {
       const updatedMovie = await Movie.findOneAndUpdate(
@@ -150,11 +145,10 @@ router.route('/movies/:title')
     }
   });
 
-// Reivews router
-var reviewsRouter = require('./routes/reviews');
+// Reviews router
 app.use('/api/reviews', reviewsRouter);
 
-// Use router
+// Use main router
 app.use('/', router);
 
 // Start server
